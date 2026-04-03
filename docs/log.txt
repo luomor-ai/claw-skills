@@ -4,3 +4,7 @@ python clawhub.py
 
 python test.py 
 ✅ 成功获取到 0 个技能
+
+python test1.py
+🚀 开始抓取 ClawHub.ai 所有技能...
+❌ 第 1 页失败：404 Client Error: Not Found for url: https://clawhub.ai/api/v1/search
