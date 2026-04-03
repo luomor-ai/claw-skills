@@ -8,3 +8,9 @@ python test.py
 python test1.py
 🚀 开始抓取 ClawHub.ai 所有技能...
 ❌ 第 1 页失败：404 Client Error: Not Found for url: https://clawhub.ai/api/v1/search
+
+python test2.py          
+🚀 开始抓取 ClawHub.ai 所有技能 (游标分页)...
+
+📌 第 1 页无数据，抓取完成！
+⚠️ 无数据可保存
