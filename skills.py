@@ -3,82 +3,90 @@ import re
 
 def extract_skill_info(file_path):
     """
-    从单个SKILL.md文件中提取name和description
-    :param file_path: 文件路径
-    :return: 字典 {name: xxx, description: xxx}
+    从SKILL.md提取 name 和 description（支持跨多行）
+    任意字段不存在则返回 None，表示跳过
     """
-    name = None
-    description = None
-    
     try:
-        # 读取文件内容（兼容utf-8编码）
         with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # 正则匹配规则（兼容多种写法：name: xxx / name：xxx / ## name: xxx）
-        # 匹配 name
-        name_match = re.search(r'name\s*[:：]\s*(.+)', content, re.IGNORECASE)
-        if name_match:
-            name = name_match.group(1).strip()
-
-        # 匹配 description
-        desc_match = re.search(r'description\s*[:：]\s*(.+)', content, re.IGNORECASE)
-        if desc_match:
-            description = desc_match.group(1).strip()
+            lines = f.readlines()
 
     except Exception as e:
-        print(f"⚠️ 读取文件失败 {file_path}: {str(e)}")
+        print(f"❌ 读取失败: {file_path} | {str(e)}")
+        return None
+
+    name = None
+    description = None
+    capture_description = False
+    desc_lines = []
+
+    # 逐行解析（支持换行）
+    for line in lines:
+        stripped = line.strip()
+
+        # ========== 匹配 name ==========
+        if not name and re.match(r'^name\s*[:：]', stripped, re.IGNORECASE):
+            # 去掉 name: 后面的内容
+            name_val = re.sub(r'^name\s*[:：]\s*', '', stripped, flags=re.IGNORECASE).strip()
+            if name_val:
+                name = name_val
+
+        # ========== 匹配 description（支持换行） ==========
+        elif not description and re.match(r'^description\s*[:：]', stripped, re.IGNORECASE):
+            # 第一行 description
+            first_line = re.sub(r'^description\s*[:：]\s*', '', stripped, flags=re.IGNORECASE).strip()
+            desc_lines.append(first_line)
+            capture_description = True  # 开始捕获后续行
+
+        elif capture_description:
+            # 遇到空行 / 下一个字段 停止捕获
+            if not stripped or stripped.startswith(('name', 'description', '#', '-', '*')):
+                capture_description = False
+                continue
+            desc_lines.append(stripped)
+
+    # 拼接 description
+    if desc_lines:
+        description = ' '.join([x.strip() for x in desc_lines if x.strip()])
+
+    # ========== 关键规则：任意一个不存在则跳过 ==========
+    if not name or not description:
+        return None
 
     return {
         "file": file_path,
-        "name": name if name else "未找到name",
-        "description": description if description else "未找到description"
+        "name": name,
+        "description": description
     }
 
 def scan_all_skill_files(root_dir="."):
-    """
-    遍历所有目录，查找SKILL.md
-    :param root_dir: 根目录（默认当前目录）
-    :return: 所有skill信息列表
-    """
     skill_list = []
-    
-    # 遍历目录
-    for dirpath, dirnames, filenames in os.walk(root_dir):
+    for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
-            # 匹配所有SKILL.md（不区分大小写）
             if filename.lower() == "skill.md":
                 file_path = os.path.join(dirpath, filename)
-                skill_info = extract_skill_info(file_path)
-                skill_list.append(skill_info)
-                print(f"✅ 已处理: {file_path}")
-    
+                info = extract_skill_info(file_path)
+                if info:
+                    skill_list.append(info)
+                    print(f"✅ 已提取: {file_path}")
+                else:
+                    print(f"⏭️  已跳过: {file_path}（字段不完整）")
     return skill_list
 
-def save_to_file(skill_list, output_file="skill_result.txt"):
-    """
-    将提取结果保存到文件
-    :param skill_list: skill信息列表
-    :param output_file: 输出文件名
-    """
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write("="*50 + "\n")
-        f.write("SKILL信息提取结果\n")
-        f.write("="*50 + "\n\n")
-        
+def save_to_file(skill_list, output="skill_result.txt"):
+    with open(output, 'w', encoding='utf-8') as f:
+        f.write("=" * 50 + "\n")
+        f.write("SKILL 信息提取结果（已跳过不完整字段）\n")
+        f.write("=" * 50 + "\n\n")
+
         for idx, skill in enumerate(skill_list, 1):
-            # f.write(f"【第{idx}个文件】\n")
-            # f.write(f"文件路径: {skill['file']}\n")
-            f.write(f"【第{idx}个技能】\n")
-            f.write(f"名称(name): {skill['name']}\n")
-            f.write(f"描述(description): {skill['description']}\n")
-            f.write("-"*50 + "\n\n")
-    
-    print(f"\n🎉 提取完成！结果已保存到: {output_file}")
+            f.write(f"【{idx}】\n")
+            f.write(f"文件路径: {skill['file']}\n")
+            f.write(f"名称: {skill['name']}\n")
+            f.write(f"描述: {skill['description']}\n")
+            f.write("-" * 50 + "\n\n")
+
+    print(f"\n🎉 提取完成！共 {len(skill_list)} 条有效数据 | 已保存到 {output}")
 
 if __name__ == "__main__":
-    # 1. 扫描所有SKILL.md
-    all_skills = scan_all_skill_files()
-    
-    # 2. 保存结果
-    save_to_file(all_skills)
+    skills = scan_all_skill_files()
+    save_to_file(skills)
